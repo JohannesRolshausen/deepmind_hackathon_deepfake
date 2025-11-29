@@ -6,15 +6,11 @@ from typing import List
 from core.llm import call_llm
 from core.schemas import AggregatedContext, TaskInput
 from steps.base import BaseStep
-from steps.exampletool1 import ImageMetadataExtractor
-from steps.exampletool2 import TextAnalyzer
 from steps.reverse_image_search import ReverseImageSearch
 from steps.synthid_detection import SynthIDDetection
-
-# from steps.visual_forensics import VisualForensicsAgent
+from steps.visual_forensics import VisualForensicsAgent
 from steps.judge_system import JudgeSystem
-
-from steps.judge_system import JudgeSystem
+from steps.ai_metadata_analyzer import AIMetadataAnalyzer
 
 def main():
     # 1. User Input (Simuliert oder via CLI)
@@ -35,13 +31,11 @@ def main():
     
     # 3. Registriere Steps
     steps: List[BaseStep] = [
-        ImageMetadataExtractor(),
-        TextAnalyzer(),
         ReverseImageSearch(),
         SynthIDDetection(),
-        # VisualForensicsAgent(),
+        VisualForensicsAgent(),
         JudgeSystem(),
-        JudgeSystem()
+        AIMetadataAnalyzer()
     ]
     
     # 4. Sequenzielle Ausführung

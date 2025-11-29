@@ -8,3 +8,6 @@ pillow
 # AI metadata extraction
 sd-parsers>=0.6.0
 
+google-search-results
+requests
+google-genai
