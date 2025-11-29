@@ -1,2 +1,4 @@
 google-generativeai
 Pillow
+pydantic
+python-dotenv
