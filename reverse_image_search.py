@@ -1,6 +1,7 @@
 import os
 
 import requests
+from google import genai
 from serpapi import GoogleSearch
 
 
@@ -81,13 +82,72 @@ def reverse_image_search(image_input, api_key="d25810ce04a9e104958cd66b7461f3de4
     return results
 
 
+def query_gemini_with_search_results(search_results, prompt_template=None, gemini_api_key=None, model_name="gemini-2.0-flash"):
+    """
+    Query Gemini API with reverse image search results.
+
+    Args:
+        search_results: Dictionary from reverse_image_search() containing image_results
+        prompt_template: Custom prompt template. If None, uses a default template.
+                         The template should include {search_results} placeholder.
+        gemini_api_key: Gemini API key. If None, reads from GOOGLE_API_KEY environment variable.
+        model_name: Name of the Gemini model to use (default: "gemini-2.0-flash")
+
+    Returns:
+        Response text from Gemini API
+    """
+    # Get API key from parameter or environment variable
+    if gemini_api_key is None:
+        gemini_api_key = os.getenv("GOOGLE_API_KEY")
+        if gemini_api_key is None:
+            raise ValueError("Gemini API key not provided. Set GOOGLE_API_KEY environment variable or pass gemini_api_key parameter.")
+
+    # Create Gemini client
+    client = genai.Client(api_key=gemini_api_key)
+
+    # Extract image results from search results
+    image_results = search_results.get("image_results", [])
+
+    if not image_results:
+        raise ValueError("No image_results found in search_results")
+
+    # Format search results into a readable string
+    formatted_results = []
+    for i, result in enumerate(image_results, 1):
+        title = result.get('title', 'No title')
+        link = result.get('link', 'No link')
+        source = result.get('source', 'Unknown source')
+        formatted_results.append(f"{i}. Title: {title}\n   Source: {source}\n   Link: {link}")
+
+    search_results_text = "\n\n".join(formatted_results)
+
+    # Use default prompt template if none provided
+    if prompt_template is None:
+        prompt_template = """Based on the following reverse image search results, I want to know solely based on the results of the reverse image search whether the uploaded image is a deepfake or not:
+
+{search_results}
+
+1. visit the links and analyze the content of the pages
+2. With the context of the pages, tell me whether the uploaded image is a deepfake or not
+
+Analysis:"""
+
+    # Format the prompt with search results
+    prompt = prompt_template.format(search_results=search_results_text)
+
+    # Generate response from Gemini
+    response = client.models.generate_content(
+        model=model_name,
+        contents=[prompt]
+    )
+
+    return response.text
+
+
 if __name__ == "__main__":
     image_url = "real.webp"
 
     results = reverse_image_search(image_url)
-
-    # Example usage with local file
-    # results = reverse_image_search("real.webp")
 
     if "image_results" in results:
         image_results = results["image_results"]
@@ -95,6 +155,20 @@ if __name__ == "__main__":
         print("\nResults:")
         for i, img in enumerate(image_results[:5], 1):  # Show first 5
             print(f"{i}. {img.get('title', 'No title')} - {img.get('link', 'No link')}")
+        
+        # Query Gemini with the search results
+        print("\n" + "="*50)
+        print("Querying Gemini API...")
+        print("="*50 + "\n")
+        try:
+            gemini_response = query_gemini_with_search_results(results)
+            print("Gemini Analysis:")
+            print("-" * 50)
+            print(gemini_response)
+        except ValueError as e:
+            print(f"Error: {e}")
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}")
     else:
         print("No image results found")
         print(f"Available keys: {results.keys()}")
