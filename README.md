@@ -14,3 +14,12 @@ run:
 2. put your step into /steps
 3. make sure your step implements the BaseStep interface: Have a method "run" that takes a TaskInput and returns a StepResult (see /steps/exampletoolx.py for an example)
 4. Tell Johannes. He will update the main.py file to include your step in the pipeline. (Needed to prevent merge conflicts)
+
+
+## API KEY
+
+1. please add your api key to an .env file that is only on your local machine. It should look like this:
+
+```
+GEMINI_API_KEY=your_api_key_here
+```

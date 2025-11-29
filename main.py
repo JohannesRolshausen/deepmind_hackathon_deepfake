@@ -28,7 +28,8 @@ def main():
     # 3. Registriere Steps
     steps: List[BaseStep] = [
         ImageMetadataExtractor(),
-        TextAnalyzer()
+        TextAnalyzer(),
+        # VisualForensicsAgent()
     ]
     
     # 4. Sequenzielle Ausführung
