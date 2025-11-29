@@ -5,10 +5,12 @@ from core.llm import call_llm
 from steps.base import BaseStep
 from steps.exampletool1 import ImageMetadataExtractor
 from steps.exampletool2 import TextAnalyzer
+from steps.ai_metadata_analyzer import AIMetadataAnalyzer
 
 def main():
     # 1. User Input (Simuliert)
-    image_path = "test_image.png"
+    # 1. User Input (Simuliert)
+    image_path = "test_image/iphone_image.jpeg"
     user_text = "instagram"
     
     print(f"Starting pipeline for img: {image_path} and text: '{user_text}'\n")
@@ -20,7 +22,8 @@ def main():
     # 3. Registriere Steps
     steps: List[BaseStep] = [
         ImageMetadataExtractor(),
-        TextAnalyzer()
+        TextAnalyzer(),
+        AIMetadataAnalyzer()
     ]
     
     # 4. Sequenzielle Ausführung
