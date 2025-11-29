@@ -7,9 +7,28 @@ Description: Uses Vision-Language Models to detect AI-generated images based on
 
 import json
 import os
+import base64
 from typing import Dict, Any, List, Optional
-from steps.base import BaseStep
-from core.schemas import TaskInput, StepResult
+from pathlib import Path
+from dataclasses import dataclass
+
+# --- Standalone Definitions (previously in steps.base and core.schemas) ---
+
+@dataclass
+class TaskInput:
+    image_path: str
+    text: Optional[str] = None
+
+@dataclass
+class StepResult:
+    source: str
+    content: Any
+
+class BaseStep:
+    def run(self, input_data: TaskInput) -> StepResult:
+        raise NotImplementedError
+
+# --- End Standalone Definitions ---
 
 
 class VisualForensicsAgent(BaseStep):
@@ -147,45 +166,33 @@ You MUST respond with a valid JSON object in this exact structure:
         Initialize the Visual Forensics Agent.
 
         Configuration is loaded from environment variables:
-        - ANTHROPIC_API_KEY or OPENAI_API_KEY: API key for LLM provider
-        - LLM_PROVIDER: "anthropic" or "openai" (default: "anthropic")
-        - LLM_MODEL: Model name (default: "claude-3-5-sonnet-20241022")
+        - GOOGLE_API_KEY: API key for Google Gemini
+        - LLM_MODEL: Model name (default: "gemini-2.5-pro")
         """
         # LLM configuration from environment
-        self.provider = os.getenv("LLM_PROVIDER", "anthropic")
-        self.model = os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022")
-        self.temperature = 0.0
-        self.max_tokens = 4096
+        self.model_name = os.getenv("LLM_MODEL", "gemini-2.5-pro")
+        self.generation_config = {
+            "temperature": 0.0,
+            "max_output_tokens": 4096,
+            "response_mime_type": "application/json",
+        }
 
-        # Initialize API client based on provider
-        if self.provider == "anthropic":
-            self._init_anthropic_client()
-        elif self.provider == "openai":
-            self._init_openai_client()
-        else:
-            raise ValueError(f"Unsupported LLM provider: {self.provider}")
+        self._init_google_client()
 
-    def _init_anthropic_client(self):
-        """Initialize Anthropic Claude client"""
+    def _init_google_client(self):
+        """Initialize Google Gemini client"""
         try:
-            import anthropic
-            api_key = os.getenv("ANTHROPIC_API_KEY")
+            import google.generativeai as genai
+            api_key = os.getenv("GOOGLE_API_KEY")
             if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
-            self.client = anthropic.Anthropic(api_key=api_key)
+                raise ValueError("GOOGLE_API_KEY not found in environment variables")
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel(
+                model_name=self.model_name,
+                system_instruction=self.SYSTEM_PROMPT
+            )
         except ImportError:
-            raise ImportError("anthropic package not installed. Install with: pip install anthropic")
-
-    def _init_openai_client(self):
-        """Initialize OpenAI client"""
-        try:
-            import openai
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY not found in environment variables")
-            self.client = openai.OpenAI(api_key=api_key)
-        except ImportError:
-            raise ImportError("openai package not installed. Install with: pip install openai")
+            raise ImportError("google-generativeai package not installed. Install with: pip install google-generativeai")
 
     def run(self, input_data: TaskInput) -> StepResult:
         """
@@ -214,9 +221,8 @@ You MUST respond with a valid JSON object in this exact structure:
 
         try:
             # Send image and prompts to Vision-Language Model
-            response_text = self._call_vision_llm(
+            response_text = self._call_google(
                 image_path=input_data.image_path,
-                system_prompt=self.SYSTEM_PROMPT,
                 user_prompt=self.USER_PROMPT_TEMPLATE
             )
 
@@ -224,7 +230,7 @@ You MUST respond with a valid JSON object in this exact structure:
             analysis_result = self._parse_response(response_text)
 
             # Add metadata
-            analysis_result['model_used'] = self.model
+            analysis_result['model_used'] = self.model_name
             analysis_result['image_path'] = input_data.image_path
 
             # Return as StepResult
@@ -240,100 +246,29 @@ You MUST respond with a valid JSON object in this exact structure:
         except Exception as e:
             raise Exception(f"Visual forensics analysis failed: {e}") from e
 
-    def _call_vision_llm(self, image_path: str, system_prompt: str, user_prompt: str) -> str:
+    def _call_google(self, image_path: str, user_prompt: str) -> str:
         """
-        Call the Vision-Language Model to analyze an image.
+        Call the Google Gemini Model to analyze an image.
 
         Args:
             image_path: Path to the image file
-            system_prompt: System prompt for the model
             user_prompt: User prompt/question about the image
 
         Returns:
             Model's text response
         """
-        import base64
-        from pathlib import Path
+        from PIL import Image
+        
+        # Open image using PIL
+        img = Image.open(image_path)
 
-        # Read and encode image
-        with open(image_path, "rb") as image_file:
-            image_data = base64.b64encode(image_file.read()).decode("utf-8")
-
-        # Determine media type
-        suffix = Path(image_path).suffix.lower()
-        media_types = {
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".gif": "image/gif",
-            ".webp": "image/webp"
-        }
-        media_type = media_types.get(suffix, "image/jpeg")
-
-        # Call appropriate provider
-        if self.provider == "anthropic":
-            return self._call_anthropic(image_data, media_type, system_prompt, user_prompt)
-        elif self.provider == "openai":
-            return self._call_openai(image_data, media_type, system_prompt, user_prompt)
-
-    def _call_anthropic(self, image_data: str, media_type: str, system_prompt: str, user_prompt: str) -> str:
-        """Call Anthropic Claude API"""
-        message = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            system=system_prompt,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_data,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": user_prompt
-                        }
-                    ],
-                }
-            ],
+        # Generate content
+        response = self.model.generate_content(
+            [user_prompt, img],
+            generation_config=self.generation_config
         )
-        return message.content[0].text
-
-    def _call_openai(self, image_data: str, media_type: str, system_prompt: str, user_prompt: str) -> str:
-        """Call OpenAI GPT-4V API"""
-        response = self.client.chat.completions.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": user_prompt
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{media_type};base64,{image_data}"
-                            }
-                        }
-                    ]
-                }
-            ]
-        )
-        return response.choices[0].message.content
+        
+        return response.text
 
     def _parse_response(self, response_text: str) -> Dict[str, Any]:
         """
