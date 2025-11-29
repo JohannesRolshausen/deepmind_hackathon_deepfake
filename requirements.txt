@@ -3,11 +3,18 @@ google-generativeai
 python-dotenv
 pydantic
 pillow
+requests
+serpapi
 # Core dependencies
+
+# Web framework
+flask
+flask-cors
 
 # AI metadata extraction
 sd-parsers>=0.6.0
 
 google-search-results
 requests
+Pillow
 google-genai

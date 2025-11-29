@@ -2,7 +2,12 @@ import os
 
 import requests
 from google import genai
-from serpapi import GoogleSearch
+
+try:
+    from serpapi.google_search import GoogleSearch
+except ImportError:
+    # Fallback for older versions
+    from serpapi import GoogleSearch
 
 from core.schemas import StepResult, TaskInput
 from steps.base import BaseStep
