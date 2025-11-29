@@ -6,13 +6,13 @@ Description: Uses Vision-Language Models to detect AI-generated images based on
 """
 
 import json
-from typing import Dict, Any, List
-from steps.base import Step
-from core.llm import get_default_client
-from core.schemas import VisualForensicsResult, ArtifactDetail
+import os
+from typing import Dict, Any, List, Optional
+from steps.base import BaseStep
+from core.schemas import TaskInput, StepResult
 
 
-class VisualForensicsAgent(Step):
+class VisualForensicsAgent(BaseStep):
     """
     Visual Forensics Agent that analyzes images for signs of AI generation.
 
@@ -142,24 +142,52 @@ You MUST respond with a valid JSON object in this exact structure:
 - Consider that real photos are imperfect; AI images often too perfect in wrong ways
 """
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self):
         """
         Initialize the Visual Forensics Agent.
 
-        Args:
-            config: Optional configuration dictionary
-                - llm_client: Custom LLM client (if None, uses default)
-                - temperature: Sampling temperature (default: 0.0 for deterministic)
-                - max_tokens: Maximum response tokens (default: 4096)
+        Configuration is loaded from environment variables:
+        - ANTHROPIC_API_KEY or OPENAI_API_KEY: API key for LLM provider
+        - LLM_PROVIDER: "anthropic" or "openai" (default: "anthropic")
+        - LLM_MODEL: Model name (default: "claude-3-5-sonnet-20241022")
         """
-        super().__init__(config)
+        # LLM configuration from environment
+        self.provider = os.getenv("LLM_PROVIDER", "anthropic")
+        self.model = os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022")
+        self.temperature = 0.0
+        self.max_tokens = 4096
 
-        # Initialize LLM client
-        self.llm_client = self.config.get('llm_client') or get_default_client()
-        self.temperature = self.config.get('temperature', 0.0)
-        self.max_tokens = self.config.get('max_tokens', 4096)
+        # Initialize API client based on provider
+        if self.provider == "anthropic":
+            self._init_anthropic_client()
+        elif self.provider == "openai":
+            self._init_openai_client()
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
-    def run(self, image_path: str) -> Dict[str, Any]:
+    def _init_anthropic_client(self):
+        """Initialize Anthropic Claude client"""
+        try:
+            import anthropic
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
+            self.client = anthropic.Anthropic(api_key=api_key)
+        except ImportError:
+            raise ImportError("anthropic package not installed. Install with: pip install anthropic")
+
+    def _init_openai_client(self):
+        """Initialize OpenAI client"""
+        try:
+            import openai
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY not found in environment variables")
+            self.client = openai.OpenAI(api_key=api_key)
+        except ImportError:
+            raise ImportError("openai package not installed. Install with: pip install openai")
+
+    def run(self, input_data: TaskInput) -> StepResult:
         """
         Execute visual forensics analysis on the given image.
 
@@ -167,51 +195,145 @@ You MUST respond with a valid JSON object in this exact structure:
         1. Sends the image to a Vision-Language Model with specialized prompts
         2. Receives structured analysis based on 2025 detection indicators
         3. Parses and validates the response
-        4. Returns structured results
+        4. Returns StepResult with analysis in content field
 
         Args:
-            image_path: Path to the image file to analyze
+            input_data: TaskInput containing image_path and optional text
 
         Returns:
-            Dictionary containing:
-                - fake_probability: float (0.0-1.0)
-                - reasoning_summary: str
-                - flagged_artifacts: List[Dict] with indicator_type, location, description, severity
-                - confidence: float (0.0-1.0)
-                - model_used: str (name of LLM model used)
+            StepResult with:
+                - source: "VisualForensicsAgent"
+                - content: Dictionary containing analysis results
 
         Raises:
             FileNotFoundError: If image_path doesn't exist
             ValueError: If LLM response cannot be parsed
             Exception: For other errors during analysis
         """
+        print(f"  [VisualForensicsAgent] Analyzing image for AI generation: {input_data.image_path}...")
+
         try:
             # Send image and prompts to Vision-Language Model
-            response_text = self.llm_client.analyze_image(
-                image_path=image_path,
+            response_text = self._call_vision_llm(
+                image_path=input_data.image_path,
                 system_prompt=self.SYSTEM_PROMPT,
-                user_prompt=self.USER_PROMPT_TEMPLATE,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature
+                user_prompt=self.USER_PROMPT_TEMPLATE
             )
 
             # Parse JSON response
             analysis_result = self._parse_response(response_text)
 
             # Add metadata
-            analysis_result['model_used'] = self.llm_client.model
+            analysis_result['model_used'] = self.model
+            analysis_result['image_path'] = input_data.image_path
 
-            # Validate using Pydantic schema
-            validated_result = VisualForensicsResult(**analysis_result)
-
-            return validated_result.model_dump()
+            # Return as StepResult
+            return StepResult(
+                source="VisualForensicsAgent",
+                content=analysis_result
+            )
 
         except FileNotFoundError as e:
-            raise FileNotFoundError(f"Image not found: {image_path}") from e
+            raise FileNotFoundError(f"Image not found: {input_data.image_path}") from e
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to parse LLM response as JSON: {e}") from e
         except Exception as e:
             raise Exception(f"Visual forensics analysis failed: {e}") from e
+
+    def _call_vision_llm(self, image_path: str, system_prompt: str, user_prompt: str) -> str:
+        """
+        Call the Vision-Language Model to analyze an image.
+
+        Args:
+            image_path: Path to the image file
+            system_prompt: System prompt for the model
+            user_prompt: User prompt/question about the image
+
+        Returns:
+            Model's text response
+        """
+        import base64
+        from pathlib import Path
+
+        # Read and encode image
+        with open(image_path, "rb") as image_file:
+            image_data = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Determine media type
+        suffix = Path(image_path).suffix.lower()
+        media_types = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp"
+        }
+        media_type = media_types.get(suffix, "image/jpeg")
+
+        # Call appropriate provider
+        if self.provider == "anthropic":
+            return self._call_anthropic(image_data, media_type, system_prompt, user_prompt)
+        elif self.provider == "openai":
+            return self._call_openai(image_data, media_type, system_prompt, user_prompt)
+
+    def _call_anthropic(self, image_data: str, media_type: str, system_prompt: str, user_prompt: str) -> str:
+        """Call Anthropic Claude API"""
+        message = self.client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            system=system_prompt,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_data,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": user_prompt
+                        }
+                    ],
+                }
+            ],
+        )
+        return message.content[0].text
+
+    def _call_openai(self, image_data: str, media_type: str, system_prompt: str, user_prompt: str) -> str:
+        """Call OpenAI GPT-4V API"""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": user_prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{media_type};base64,{image_data}"
+                            }
+                        }
+                    ]
+                }
+            ]
+        )
+        return response.choices[0].message.content
 
     def _parse_response(self, response_text: str) -> Dict[str, Any]:
         """
@@ -262,96 +384,3 @@ You MUST respond with a valid JSON object in this exact structure:
             result['flagged_artifacts'] = []
 
         return result
-
-    def batch_analyze(self, image_paths: List[str]) -> List[Dict[str, Any]]:
-        """
-        Analyze multiple images in batch.
-
-        Args:
-            image_paths: List of paths to image files
-
-        Returns:
-            List of analysis results, one per image
-        """
-        results = []
-        for image_path in image_paths:
-            try:
-                result = self.run(image_path)
-                result['image_path'] = image_path
-                result['status'] = 'success'
-            except Exception as e:
-                result = {
-                    'image_path': image_path,
-                    'status': 'error',
-                    'error_message': str(e)
-                }
-            results.append(result)
-
-        return results
-
-
-# Convenience function for standalone usage
-def analyze_image_for_deepfake(image_path: str, config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Standalone function to analyze an image for AI generation.
-
-    Args:
-        image_path: Path to the image file
-        config: Optional configuration for the agent
-
-    Returns:
-        Analysis results dictionary
-
-    Example:
-        >>> result = analyze_image_for_deepfake("suspicious_photo.jpg")
-        >>> print(f"Fake probability: {result['fake_probability']:.2%}")
-        >>> print(f"Reasoning: {result['reasoning_summary']}")
-    """
-    agent = VisualForensicsAgent(config=config)
-    return agent.run(image_path)
-
-
-if __name__ == "__main__":
-    # Example usage for testing
-    import sys
-
-    if len(sys.argv) < 2:
-        print("Usage: python visual_forensics.py <image_path>")
-        sys.exit(1)
-
-    image_path = sys.argv[1]
-
-    print(f"Analyzing: {image_path}")
-    print("-" * 60)
-
-    try:
-        result = analyze_image_for_deepfake(image_path)
-
-        print(f"\n{'='*60}")
-        print(f"ANALYSIS RESULTS")
-        print(f"{'='*60}")
-        print(f"\nFake Probability: {result['fake_probability']:.1%}")
-        print(f"Confidence: {result['confidence']:.1%}")
-        print(f"Model Used: {result['model_used']}")
-
-        print(f"\n{'─'*60}")
-        print(f"REASONING")
-        print(f"{'─'*60}")
-        print(f"{result['reasoning_summary']}")
-
-        if result['flagged_artifacts']:
-            print(f"\n{'─'*60}")
-            print(f"FLAGGED ARTIFACTS ({len(result['flagged_artifacts'])} found)")
-            print(f"{'─'*60}")
-
-            for i, artifact in enumerate(result['flagged_artifacts'], 1):
-                print(f"\n{i}. [{artifact['indicator_type']}]")
-                print(f"   Location: {artifact['location']}")
-                print(f"   Description: {artifact['description']}")
-                print(f"   Severity: {artifact['severity']:.1%}")
-
-        print(f"\n{'='*60}\n")
-
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
