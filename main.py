@@ -7,12 +7,13 @@ from steps.base import BaseStep
 from steps.exampletool1 import ImageMetadataExtractor
 from steps.exampletool2 import TextAnalyzer
 from steps.visual_forensics import VisualForensicsAgent
+from steps.judge_system import JudgeSystem
 
 def main():
     # 1. User Input (Simuliert oder via CLI)
     parser = argparse.ArgumentParser(description="Hackathon Gemini Pipeline")
-    parser.add_argument("--img", type=str, default="test_image.png", help="Path to the image file")
-    parser.add_argument("--text", type=str, default="instagram", help="User input text")
+    parser.add_argument("--img", type=str, default="./example_data/anypic.png", help="Path to the image file")
+    parser.add_argument("--text", type=str, default="instagram", help="instagram picture")
     
     args = parser.parse_args()
     
@@ -29,7 +30,8 @@ def main():
     steps: List[BaseStep] = [
         ImageMetadataExtractor(),
         TextAnalyzer(),
-        # VisualForensicsAgent()
+        # VisualForensicsAgent(),
+        JudgeSystem()
     ]
     
     # 4. Sequenzielle Ausführung
