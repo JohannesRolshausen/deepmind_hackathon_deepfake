@@ -44,6 +44,7 @@ def main():
             result = step.run(task_input)
             context.results.append(result)
             print(f"✅ {result.source} done.")
+            print(result.content)
         except Exception as e:
             print(f"❌ error in step {step.__class__.__name__}: {e}")
 
