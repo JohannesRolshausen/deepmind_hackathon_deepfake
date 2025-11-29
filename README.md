@@ -1,16 +1,3 @@
 # Folder Structure
 
-deepmind_hackathon_deepfake/
-│
-├── .env                # API Keys etc.
-├── main.py             # Entry Point
-│
-├── core/
-│   ├── llm.py          # LLM Wrapper
-│   └── schemas.py      # Pydantic Models ( DTOs/POJOs)
-│
-└── steps/            # the actual intereseting steps
-    ├── __init__.py
-    ├── base.py         # Interface Definition
-    ├── tool1.py  
-    └── tool2.py ...
+<img width="284" height="236" alt="image" src="https://github.com/user-attachments/assets/0488aac7-c0f4-4721-b8f4-fcb2100c9bbc" />
