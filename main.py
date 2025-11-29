@@ -1,4 +1,5 @@
 # main.py
+import argparse
 from typing import List
 from core.schemas import AggregatedContext, TaskInput
 from core.llm import call_llm
@@ -7,9 +8,15 @@ from steps.exampletool1 import ImageMetadataExtractor
 from steps.exampletool2 import TextAnalyzer
 
 def main():
-    # 1. User Input (Simuliert)
-    image_path = "test_image.png"
-    user_text = "instagram"
+    # 1. User Input (Simuliert oder via CLI)
+    parser = argparse.ArgumentParser(description="Hackathon Gemini Pipeline")
+    parser.add_argument("--img", type=str, default="test_image.png", help="Path to the image file")
+    parser.add_argument("--text", type=str, default="instagram", help="User input text")
+    
+    args = parser.parse_args()
+    
+    image_path = args.img
+    user_text = args.text
     
     print(f"Starting pipeline for img: {image_path} and text: '{user_text}'\n")
     
