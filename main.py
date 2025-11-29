@@ -1,17 +1,31 @@
 # main.py
+import argparse
+import json
 from typing import List
-from core.schemas import AggregatedContext, TaskInput
+
 from core.llm import call_llm
+from core.schemas import AggregatedContext, TaskInput
 from steps.base import BaseStep
 from steps.exampletool1 import ImageMetadataExtractor
 from steps.exampletool2 import TextAnalyzer
-from steps.ai_metadata_analyzer import AIMetadataAnalyzer
+from steps.reverse_image_search import ReverseImageSearch
+from steps.synthid_detection import SynthIDDetection
+
+# from steps.visual_forensics import VisualForensicsAgent
+from steps.judge_system import JudgeSystem
+
+from steps.judge_system import JudgeSystem
 
 def main():
-    # 1. User Input (Simuliert)
-    # 1. User Input (Simuliert)
-    image_path = "test_image/iphone_image.jpeg"
-    user_text = "instagram"
+    # 1. User Input (Simuliert oder via CLI)
+    parser = argparse.ArgumentParser(description="Hackathon Gemini Pipeline")
+    parser.add_argument("--img", type=str, default="./example_data/anypic.png", help="Path to the image file")
+    parser.add_argument("--text", type=str, default="instagram", help="instagram picture")
+    
+    args = parser.parse_args()
+    
+    image_path = args.img
+    user_text = args.text
     
     print(f"Starting pipeline for img: {image_path} and text: '{user_text}'\n")
     
@@ -23,7 +37,11 @@ def main():
     steps: List[BaseStep] = [
         ImageMetadataExtractor(),
         TextAnalyzer(),
-        AIMetadataAnalyzer()
+        ReverseImageSearch(),
+        SynthIDDetection(),
+        # VisualForensicsAgent(),
+        JudgeSystem(),
+        JudgeSystem()
     ]
     
     # 4. Sequenzielle Ausführung
@@ -38,7 +56,14 @@ def main():
     # 5. Finaler LLM Call
     print("\n--- FINAL LLM CALL ---")
     final_answer = call_llm(context)
-    print(final_answer)
+
+    try:
+        data = json.loads(final_answer)
+        print(f"\n🔍 Deepfake Probability: {data.get('probability_score')}%")
+        print(f"📝 Explanation: {data.get('explanation')}")
+    except json.JSONDecodeError:
+        print(f"Raw Output: {final_answer}")
+
 
 if __name__ == "__main__":
     main()
