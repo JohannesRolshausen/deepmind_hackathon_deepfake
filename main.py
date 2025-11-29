@@ -14,6 +14,7 @@ from steps.synthid_detection import SynthIDDetection
 # from steps.visual_forensics import VisualForensicsAgent
 from steps.judge_system import JudgeSystem
 
+from steps.judge_system import JudgeSystem
 
 def main():
     # 1. User Input (Simuliert oder via CLI)
@@ -39,6 +40,7 @@ def main():
         ReverseImageSearch(),
         SynthIDDetection(),
         # VisualForensicsAgent(),
+        JudgeSystem(),
         JudgeSystem()
     ]
     
