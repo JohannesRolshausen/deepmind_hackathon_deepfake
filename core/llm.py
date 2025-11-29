@@ -4,11 +4,13 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from core.schemas import AggregatedContext
 
+from typing import List, Any, Optional
+
 load_dotenv()
 
-def call_llm(context: AggregatedContext) -> str:
+def query_llm(prompt: str, images: Optional[List[Any]] = None) -> str:
     """
-    Calls the Gemini API to analyze the context and return a deepfake probability and explanation.
+    Generic function to query the Gemini API with a given prompt and optional images.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -17,6 +19,20 @@ def call_llm(context: AggregatedContext) -> str:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-2.0-flash')
 
+    try:
+        content = [prompt]
+        if images:
+            content.extend(images)
+            
+        response = model.generate_content(content)
+        return response.text
+    except Exception as e:
+        return f"Error calling Gemini API: {e}"
+
+def call_llm(context: AggregatedContext) -> str:
+    """
+    Calls the Gemini API to analyze the context and return a deepfake probability and explanation.
+    """
     context_json = context.model_dump_json(indent=2)
     
     prompt = f"""
@@ -33,8 +49,4 @@ def call_llm(context: AggregatedContext) -> str:
     Do not include markdown formatting like ```json.
     """
 
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"Error calling Gemini API: {e}"
+    return query_llm(prompt)
