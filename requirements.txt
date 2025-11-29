@@ -1,4 +1,10 @@
+
 google-generativeai
 python-dotenv
 pydantic
 pillow
+# Core dependencies
+
+# AI metadata extraction
+sd-parsers>=0.6.0
+
