@@ -12,13 +12,15 @@ from steps.reverse_image_search import ReverseImageSearch
 from steps.synthid_detection import SynthIDDetection
 
 # from steps.visual_forensics import VisualForensicsAgent
+from steps.judge_system import JudgeSystem
 
+from steps.judge_system import JudgeSystem
 
 def main():
     # 1. User Input (Simuliert oder via CLI)
     parser = argparse.ArgumentParser(description="Hackathon Gemini Pipeline")
-    parser.add_argument("--img", type=str, default="test_image.png", help="Path to the image file")
-    parser.add_argument("--text", type=str, default="instagram", help="User input text")
+    parser.add_argument("--img", type=str, default="./example_data/anypic.png", help="Path to the image file")
+    parser.add_argument("--text", type=str, default="instagram", help="instagram picture")
     
     args = parser.parse_args()
     
@@ -37,7 +39,9 @@ def main():
         TextAnalyzer(),
         ReverseImageSearch(),
         SynthIDDetection(),
-        # VisualForensicsAgent()
+        # VisualForensicsAgent(),
+        JudgeSystem(),
+        JudgeSystem()
     ]
     
     # 4. Sequenzielle Ausführung
