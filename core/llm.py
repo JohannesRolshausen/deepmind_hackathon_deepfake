@@ -15,7 +15,7 @@ def call_llm(context: AggregatedContext) -> str:
         return "Error: GEMINI_API_KEY not found in environment variables."
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-3-pro-preview')
+    model = genai.GenerativeModel('gemini-2.0-flash')
 
     context_json = context.model_dump_json(indent=2)
     

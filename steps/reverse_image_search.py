@@ -4,6 +4,9 @@ import requests
 from google import genai
 from serpapi import GoogleSearch
 
+from core.schemas import StepResult, TaskInput
+from steps.base import BaseStep
+
 
 def upload_image_to_host(image_path):
     """
@@ -142,6 +145,71 @@ Analysis:"""
     )
 
     return response.text
+
+
+class ReverseImageSearch(BaseStep):
+    def run(self, input_data: TaskInput) -> StepResult:
+        # PUT YOUR LOGIC IN HERE
+        print(f"  [Tool3] Performing reverse image search on {input_data.image_path}...")
+        
+        try:
+            # Perform reverse image search
+            search_results = reverse_image_search(input_data.image_path)
+            
+            if "image_results" in search_results:
+                image_results = search_results["image_results"]
+                print(f"  Found {len(image_results)} image results")
+                
+                # Query Gemini with the search results
+                try:
+                    gemini_response = query_gemini_with_search_results(search_results)
+                    
+                    return StepResult(
+                        source="ReverseImageSearch",
+                        content={
+                            "num_results": len(image_results),
+                            "analysis": gemini_response,
+                            "top_results": [
+                                {
+                                    "title": img.get('title', 'No title'),
+                                    "link": img.get('link', 'No link'),
+                                    "source": img.get('source', 'Unknown source')
+                                }
+                                for img in image_results[:5]
+                            ]
+                        }
+                    )
+                except ValueError as e:
+                    return StepResult(
+                        source="ReverseImageSearch",
+                        content={
+                            "error": str(e),
+                            "num_results": len(image_results)
+                        }
+                    )
+                except Exception as e:
+                    return StepResult(
+                        source="ReverseImageSearch",
+                        content={
+                            "error": f"Error calling Gemini API: {str(e)}",
+                            "num_results": len(image_results)
+                        }
+                    )
+            else:
+                return StepResult(
+                    source="ReverseImageSearch",
+                    content={
+                        "error": "No image results found",
+                        "available_keys": list(search_results.keys())
+                    }
+                )
+        except Exception as e:
+            return StepResult(
+                source="ReverseImageSearch",
+                content={
+                    "error": f"Error performing reverse image search: {str(e)}"
+                }
+            )
 
 
 if __name__ == "__main__":

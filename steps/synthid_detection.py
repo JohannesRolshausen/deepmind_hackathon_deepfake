@@ -15,6 +15,9 @@ from typing import Any, Dict, Optional
 
 from google import genai
 
+from core.schemas import StepResult, TaskInput
+from steps.base import BaseStep
+
 # Optional: Uncomment if using Vertex AI
 # from google.cloud import aiplatform
 
@@ -251,6 +254,36 @@ def detect_synthid_watermark(
         return detect_synthid_watermark_gemini(image_path, api_key)
     else:
         raise ValueError(f"Unknown method: {method}. Use 'auto', 'vertex_ai', or 'gemini'.")
+
+
+class SynthIDDetection(BaseStep):
+    def run(self, input_data: TaskInput) -> StepResult:
+        # PUT YOUR LOGIC IN HERE
+        print(f"  [Tool4] Detecting SynthID watermark in {input_data.image_path}...")
+        
+        try:
+            # Use the detect_synthid_watermark function with auto method
+            result = detect_synthid_watermark(
+                input_data.image_path,
+                method="auto"
+            )
+            
+            return StepResult(
+                source="SynthIDDetection",
+                content={
+                    "has_watermark": result.get("has_watermark", False),
+                    "confidence": result.get("confidence", 0.0),
+                    "method": result.get("method", "unknown"),
+                    "raw_response": result.get("raw_response", None)
+                }
+            )
+        except Exception as e:
+            return StepResult(
+                source="SynthIDDetection",
+                content={
+                    "error": f"Error detecting SynthID watermark: {str(e)}"
+                }
+            )
 
 
 if __name__ == "__main__":
