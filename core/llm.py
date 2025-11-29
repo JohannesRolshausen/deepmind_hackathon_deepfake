@@ -1,13 +1,40 @@
+import os
+import json
+import google.generativeai as genai
+from dotenv import load_dotenv
 from core.schemas import AggregatedContext
+
+load_dotenv()
 
 def call_llm(context: AggregatedContext) -> str:
     """
-    Simuliert den Call an das LLM.
+    Calls the Gemini API to analyze the context and return a deepfake probability and explanation.
     """
-    print("  [LLM] Generiere Antwort basierend auf gesammelten Daten...")
-    
-    # Hier würde der echte API Call stehen (z.B. OpenAI, Gemini)
-    # Wir dumpen einfach den Context als JSON zur Demonstration
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return "Error: GEMINI_API_KEY not found in environment variables."
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-3-pro-preview')
+
     context_json = context.model_dump_json(indent=2)
     
-    return f"LLM Entscheidung basierend auf:\n{context_json}\n\n-> Ergebnis: Das Bild zeigt vermutlich eine Person (basierend auf Tool1) und der Text ist neutral (basierend auf Tool2)."
+    prompt = f"""
+    Analyze the following task input and tool results to determine if the content is a deepfake.
+    
+    Context:
+    {context_json}
+    
+    Return a JSON object with the following structure:
+    {{
+        "probability_score": <int between 0 and 100>,
+        "explanation": "<string explanation>"
+    }}
+    Do not include markdown formatting like ```json.
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error calling Gemini API: {e}"

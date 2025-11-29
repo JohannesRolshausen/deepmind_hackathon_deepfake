@@ -6,6 +6,7 @@ from core.llm import call_llm
 from steps.base import BaseStep
 from steps.exampletool1 import ImageMetadataExtractor
 from steps.exampletool2 import TextAnalyzer
+from steps.visual_forensics import VisualForensicsAgent
 
 def main():
     # 1. User Input (Simuliert oder via CLI)
@@ -42,7 +43,14 @@ def main():
     # 5. Finaler LLM Call
     print("\n--- FINAL LLM CALL ---")
     final_answer = call_llm(context)
-    print(final_answer)
+    
+    try:
+        import json
+        data = json.loads(final_answer)
+        print(f"\n🔍 Deepfake Probability: {data.get('probability_score')}%")
+        print(f"📝 Explanation: {data.get('explanation')}")
+    except json.JSONDecodeError:
+        print(f"Raw Output: {final_answer}")
 
 if __name__ == "__main__":
     main()
