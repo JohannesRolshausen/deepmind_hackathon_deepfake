@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepfake Detection Tool</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Deepfake Detection Tool</h1>
+            <p class="subtitle">AI-Powered Image Authenticity Analysis</p>
+        </header>
+
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <div class="upload-content">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p>Click to upload or drag and drop</p>
+                    <p class="upload-hint">PNG, JPG, WEBP up to 10MB</p>
+                </div>
+            </div>
+            <div class="text-input-section">
+                <label for="userText">Additional Context (Optional):</label>
+                <input type="text" id="userText" placeholder="e.g., instagram picture">
+            </div>
+            <button id="analyzeBtn" class="analyze-btn" disabled>Analyze Image</button>
+        </div>
+
+        <!-- Final Result Section (Top Priority) -->
+        <div class="result-section" id="resultSection" style="display: none;">
+            <h2>🎯 Final Analysis Result</h2>
+            <div class="result-card" id="resultCard">
+                <div class="probability-display">
+                    <div class="probability-circle" id="probabilityCircle">
+                        <span id="probabilityValue">--</span>
+                        <span class="probability-label">%</span>
+                    </div>
+                    <div class="probability-text">
+                        <span id="probabilityLabel">Deepfake Probability</span>
+                    </div>
+                </div>
+                <div class="explanation-box">
+                    <h3>Explanation</h3>
+                    <p id="explanationText">Analysis in progress...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div class="progress-section" id="progressSection" style="display: none;">
+            <h2>📊 Analysis Progress</h2>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-text" id="progressText">0%</span>
+            </div>
+            <div class="current-step" id="currentStep"></div>
+        </div>
+
+        <!-- Tools Output Section -->
+        <div class="tools-section" id="toolsSection" style="display: none;">
+            <h2>🔧 Tool Results</h2>
+            <div class="tools-grid" id="toolsGrid">
+                <!-- Tool results will be dynamically inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
